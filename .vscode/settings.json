@@ -6,6 +6,9 @@
     "Colors",
     "daos",
     "formals",
+    "fullchain",
+    "pem",
+    "privkey",
     "pubspec",
     "todos",
     "unawaited"
