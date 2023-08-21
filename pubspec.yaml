@@ -1,0 +1,20 @@
+name: server
+description: The monolith game server.
+version: 1.0.0
+repository: https://github.com/monolith-game/server
+publish_to: none
+
+environment:
+  sdk: ^3.1.0-262.3.beta
+
+dependencies:
+  args: ^2.4.2
+  database:
+    path: ../database
+  path: ^1.8.0
+  shelf: ^1.4.1
+  shelf_plus: ^1.7.0
+
+dev_dependencies:
+  lints: ^2.0.0
+  test: ^1.21.0
