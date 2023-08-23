@@ -2,6 +2,7 @@
 import 'dart:io';
 
 import 'package:args/command_runner.dart';
+import 'package:database/database.dart';
 
 import '../app_config.dart';
 
@@ -27,7 +28,8 @@ class ProfilesServerCommand extends Command {
   @override
   Future<void> run() async {
     final database = appConfig.getDatabase();
-    final profiles = await database.select(database.serverProfiles).get();
+    final utilsDao = database.utilsDao;
+    final profiles = (await utilsDao.getServerProfileContexts()).toList();
     final serverSecurityContextsDao = database.serverSecurityContextsDao;
     if (profiles.isEmpty) {
       final serverProfilesDao = database.serverProfilesDao;
@@ -39,33 +41,37 @@ class ProfilesServerCommand extends Command {
         keyFile: File('privkey.pem'),
       );
       profiles.addAll([
-        await serverProfilesDao.createServerProfile(
-          name: 'Insecure',
-          host: '0.0.0.0',
-          port: 8080,
+        ServerProfileContext(
+          serverProfile: await serverProfilesDao.createServerProfile(
+            name: 'Insecure',
+            host: '0.0.0.0',
+            port: 8080,
+          ),
         ),
-        await serverProfilesDao.createServerProfile(
-          name: 'Secure',
-          host: '0.0.0.0',
-          port: 8080,
+        ServerProfileContext(
+          serverProfile: await serverProfilesDao.createServerProfile(
+            name: 'Secure',
+            host: '0.0.0.0',
+            port: 8080,
+            securityContext: serverSecurityContext,
+          ),
           securityContext: serverSecurityContext,
         ),
       ]);
     }
     print('Server Profiles:');
-    for (final profile in profiles) {
-      print(profile.name);
+    for (final context in profiles) {
+      final profile = context.serverProfile;
+      print('#${profile.id}: ${profile.name}');
       print('Listen on: ${profile.host}:${profile.port}');
-      final serverSecurityContextId = profile.securityContextId;
-      if (serverSecurityContextId == null) {
+      final security = context.securityContext;
+      if (security == null) {
         print('Security: None');
       } else {
-        final context = await serverSecurityContextsDao
-            .getServerSecurityContext(serverSecurityContextId);
         print(
-          'Chain file: ${context.chainFilePath} (${context.chainPassword})',
+          'Chain file: ${security.chainFilePath} (${security.chainPassword})',
         );
-        print('Key file: ${context.keyFilePath} (${context.keyPassword})');
+        print('Key file: ${security.keyFilePath} (${security.keyPassword})');
       }
     }
     await database.close();
