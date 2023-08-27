@@ -1,23 +1,24 @@
+import 'dart:io';
+
 import 'package:args/command_runner.dart';
+import 'package:database/database.dart';
+import 'package:logging/logging.dart';
 import 'package:shelf_plus/shelf_plus.dart';
+
+import '../app_config.dart';
 
 /// Start the server running.
 class RunServerCommand extends Command {
   /// Create an instance.
-  RunServerCommand() : super() {
-    argParser
-      ..addOption(
-        'host',
-        defaultsTo: '0.0.0.0',
-        help: 'The hostname to bind to.',
-      )
-      ..addOption(
-        'port',
-        abbr: 'p',
-        defaultsTo: '8080',
-        help: 'The port to listen on.',
-      );
+  RunServerCommand(this.appConfig) : super() {
+    argParser.addOption(
+      'profile-id',
+      abbr: 'p',
+    );
   }
+
+  /// The app configuration to use.
+  final AppConfig appConfig;
 
   /// The name of this command.
   @override
@@ -29,19 +30,58 @@ class RunServerCommand extends Command {
 
   /// Run the server.
   @override
-  void run() {
-    final port = int.tryParse(argResults?['port']);
-    final host = argResults?['host'];
-    if (port == null) {
-      throw UsageException('Invalid port.', 'Port must be a number.');
+  Future<void> run() async {
+    final logger = Logger('Run Server');
+    final database = appConfig.getDatabase();
+    final serverProfilesDao = database.serverProfilesDao;
+    final profileIdString = argResults?['profile-id'] as String?;
+    final ServerProfileContext profileContext;
+    if (profileIdString == null) {
+      final profiles = await serverProfilesDao.getServerProfileContexts();
+      if (profiles.isEmpty) {
+        usageException(
+          'First create server profiles with the `profiles` subcommand.',
+        );
+      }
+      profileContext = profiles.first;
+    } else {
+      final profileId = int.tryParse(profileIdString);
+      if (profileId == null) {
+        usageException('Invalid ID: $profileIdString.');
+      }
+      try {
+        profileContext =
+            await serverProfilesDao.getServerProfileContext(profileId);
+        // ignore: avoid_catching_errors
+      } on StateError {
+        usageException('Invalid profile ID: $profileId.');
+      }
     }
-    shelfRun(
+    logger.info('Using server profile $profileContext.');
+    final serverSecurity = profileContext.securityContext;
+    final SecurityContext? securityContext;
+    if (serverSecurity != null) {
+      securityContext = SecurityContext()
+        ..useCertificateChain(
+          serverSecurity.chainFilePath,
+          password: serverSecurity.chainPassword,
+        )
+        ..usePrivateKey(
+          serverSecurity.keyFilePath,
+          password: serverSecurity.keyPassword,
+        );
+    } else {
+      securityContext = null;
+    }
+    final profile = profileContext.serverProfile;
+    await shelfRun(
       () {
         final router = Router().plus..use(logRequests());
         return router;
       },
-      defaultBindAddress: host,
-      defaultBindPort: port,
+      defaultBindAddress: profile.host,
+      defaultBindPort: profile.port,
+      securityContext: securityContext,
     );
   }
 }

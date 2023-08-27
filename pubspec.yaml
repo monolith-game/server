@@ -11,6 +11,7 @@ dependencies:
   args: ^2.4.2
   database:
     path: ../database
+  logging: ^1.2.0
   path: ^1.8.0
   shelf: ^1.4.1
   shelf_plus: ^1.7.0
