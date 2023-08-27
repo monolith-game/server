@@ -28,11 +28,11 @@ class ProfilesServerCommand extends Command {
   @override
   Future<void> run() async {
     final database = appConfig.getDatabase();
-    final utilsDao = database.utilsDao;
-    final profiles = (await utilsDao.getServerProfileContexts()).toList();
+    final serverProfilesDao = database.serverProfilesDao;
+    final profiles =
+        (await serverProfilesDao.getServerProfileContexts()).toList();
     final serverSecurityContextsDao = database.serverSecurityContextsDao;
     if (profiles.isEmpty) {
-      final serverProfilesDao = database.serverProfilesDao;
       final serverSecurityContext =
           await serverSecurityContextsDao.createServerSecurityContext(
         chainFile: File(
