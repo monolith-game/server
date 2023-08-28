@@ -1,9 +1,11 @@
 import 'dart:io';
 
 import 'package:args/args.dart';
+import 'package:database/constants.dart';
 import 'package:database/database.dart';
 import 'package:logging/logging.dart';
 import 'package:logging_appenders/logging_appenders.dart';
+import 'package:server/src/connection_context.dart';
 import 'package:shelf_plus/shelf_plus.dart';
 
 Future<void> main(final List<String> arguments) async {
@@ -133,11 +135,40 @@ Future<void> main(final List<String> arguments) async {
         );
     }
     final protocol = securityContext == null ? 'http' : 'https';
+    final connections = <ConnectionContext>[];
     await shelfRun(
       () {
         final router = Router().plus
           ..use(logRequests())
-          ..get('/', () => 'Welcome to Monolith.');
+          ..get('/', () => 'Welcome to Monolith.')
+          // ignore: avoid_types_on_closure_parameters
+          ..get('/ws/', (final Request request) {
+            final connectionInfo = request.context['shelf.io.connection_info']
+                as HttpConnectionInfo;
+            final uuid = uuidGenerator.v4();
+            final connection = ConnectionContext(
+              uuid: uuid,
+              host: connectionInfo.remoteAddress.host,
+              port: connectionInfo.remotePort,
+            );
+            return WebSocketSession(
+              onOpen: (final session) {
+                connection.logger.info('Connection established.');
+                connections.add(connection);
+              },
+              onClose: (final session) {
+                connection.logger.info('Connection closed.');
+                connections.remove(connection);
+              },
+              onMessage: (final session, final data) => connection.logger.info(
+                data,
+              ),
+              onError: (final session, final error) =>
+                  connection.logger.warning(
+                error,
+              ),
+            );
+          });
         return router;
       },
       defaultBindAddress: host,

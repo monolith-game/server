@@ -12,6 +12,7 @@
     "pubspec",
     "todos",
     "unawaited",
-    "writeln"
+    "writeln",
+    "ws"
   ]
 }
